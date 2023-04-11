@@ -11,6 +11,7 @@
     <Title>BehaviorGenerator</Title>
     <Authors>gamedo</Authors>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Version>1.0.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
