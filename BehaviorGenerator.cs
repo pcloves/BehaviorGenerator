@@ -262,28 +262,51 @@ public partial class BehaviorAi
 
     private string GenerateStaticField()
     {
-        var customSignalBuilder = new StringBuilder(1024);
+        var customSignalName2Id = new StringBuilder(1024);
+        var customSignalId2Name = new StringBuilder(1024);
+        var id = 10;
         foreach (var behaviorAiFileContext in _behaviorAiFileContexts.Values)
         {
             foreach (var eventHandlerContext in behaviorAiFileContext.DelegateContext)
             {
-                customSignalBuilder.Append($"        \"{eventHandlerContext.SignalName}\",\n");
+                customSignalName2Id.Append($"        {{ \"{eventHandlerContext.SignalName}\", {id} }},\n");
+                customSignalId2Name.Append($"        {{ {id}, \"{eventHandlerContext.SignalName}\" }},\n");
+
+                id++;
             }
         }
 
-        //lang=C#
-        var myString = @$"    public static readonly string[] SignalNameAll = {{
-        ""script_changed"",
-        ""property_list_changed"",
-        ""ready"",
-        ""renamed"",
-        ""tree_entered"",
-        ""tree_exiting"",
-        ""tree_exited"",
-        ""child_entered_tree"",
-        ""child_exiting_tree"",
-{customSignalBuilder}
+        customSignalName2Id.Length -= 1;
+        customSignalId2Name.Length -= 1;
+        
+        var signalName2Id = @$"    public static readonly System.Collections.Generic.Dictionary<string, int> SignalName2Id = new()
+    {{
+        {{ ""script_changed"", 1 }},
+        {{ ""property_list_changed"", 2 }},
+        {{ ""ready"", 3 }},
+        {{ ""renamed"", 4 }},
+        {{ ""tree_entered"", 5 }},
+        {{ ""tree_exiting"", 6 }},
+        {{ ""tree_exited"", 7 }},
+        {{ ""child_entered_tree"", 8 }},
+        {{ ""child_exiting_tree"", 9 }},
+{customSignalName2Id}
     }};";
-        return myString;
+        
+        var signalId2Name = @$"    public static readonly System.Collections.Generic.Dictionary<int, string> SignalId2Name = new()
+    {{
+        {{ 1, ""script_changed"" }},
+        {{ 2, ""property_list_changed"" }},
+        {{ 3, ""ready"" }},
+        {{ 4, ""renamed"" }},
+        {{ 5, ""tree_entered"" }},
+        {{ 6, ""tree_exiting"" }},
+        {{ 7, ""tree_exited"" }},
+        {{ 8, ""child_entered_tree"" }},
+        {{ 9, ""child_exiting_tree"" }},
+{customSignalId2Name}
+    }};";
+        
+        return signalName2Id + "\n\n" + signalId2Name;
     }
 }
