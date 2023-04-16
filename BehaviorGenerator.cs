@@ -39,6 +39,14 @@ public class BehaviorGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
+#if DEBUG
+        if (!Debugger.IsAttached)
+        {
+            Debugger.Launch();
+            SpinWait.SpinUntil(() => Debugger.IsAttached, 5000);
+        }
+#endif
+
         var valuesProvider = context.SyntaxProvider.CreateSyntaxProvider(SyntacticPredicate, SemanticTransform);
 
         context.RegisterSourceOutput(valuesProvider, Execute);
@@ -47,7 +55,7 @@ public class BehaviorGenerator : IIncrementalGenerator
     private void Execute(SourceProductionContext sourceProductionContext,
         BehaviorAiFileContext behaviorAiContext)
     {
-        var lastBehaviorAiClass = ++_behaviorAiPartialClassExecutedCount == _behaviorAiPartialClassCount;
+        var lastBehaviorAiClass = ++_behaviorAiPartialClassExecutedCount >= _behaviorAiPartialClassCount;
         var signalMethod = lastBehaviorAiClass
             ? $"{GenerateConnectSignalMethod()}\n\n{GenerateDisconnectSignalMethod()}"
             : "";
@@ -97,6 +105,7 @@ public partial class BehaviorAi
         }
 
         _behaviorAiPartialClassCount++;
+
         return true;
     }
 
@@ -115,13 +124,14 @@ public partial class BehaviorAi
         var eventHandlerContexts = delegateSyntaxS
             //转换成symbol
             .Select(delegateSyntax => semanticModel.GetDeclaredSymbol(delegateSyntax, cancellationToken))
+            .Where(delegateSymbol => delegateSymbol != null)
             //至少有一个Attribute包含[Signal]
-            .Where(delegateSymbol => delegateSymbol.GetAttributes()
-                .Any(attribute => attribute.AttributeClass.Name == "SignalAttribute"))
-            .Where(delegateSymbol => delegateSymbol.Name.EndsWith("EventHandler"))
-            .Select(eventHandlerSymbol => new EventHandlerContext(eventHandlerSymbol.Name,
+            .Where(delegateSymbol => delegateSymbol!.GetAttributes()
+                .Any(attribute => attribute.AttributeClass?.Name == "SignalAttribute"))
+            .Where(delegateSymbol => delegateSymbol!.Name.EndsWith("EventHandler"))
+            .Select(eventHandlerSymbol => new EventHandlerContext(eventHandlerSymbol!.Name,
                 eventHandlerSymbol.Name.Replace("EventHandler", ""),
-                eventHandlerSymbol.DelegateInvokeMethod.Parameters
+                eventHandlerSymbol.DelegateInvokeMethod!.Parameters
                     .Select(param => param.Name)
                     .ToImmutableArray()))
             .ToImmutableArray();
@@ -278,8 +288,9 @@ public partial class BehaviorAi
 
         customSignalName2Id.Length -= 1;
         customSignalId2Name.Length -= 1;
-        
-        var signalName2Id = @$"    public static readonly System.Collections.Generic.Dictionary<string, int> SignalName2Id = new()
+
+        var signalName2Id =
+            @$"    public static readonly System.Collections.Generic.Dictionary<string, int> SignalName2Id = new()
     {{
         {{ ""script_changed"", 1 }},
         {{ ""property_list_changed"", 2 }},
@@ -292,8 +303,9 @@ public partial class BehaviorAi
         {{ ""child_exiting_tree"", 9 }},
 {customSignalName2Id}
     }};";
-        
-        var signalId2Name = @$"    public static readonly System.Collections.Generic.Dictionary<int, string> SignalId2Name = new()
+
+        var signalId2Name =
+            @$"    public static readonly System.Collections.Generic.Dictionary<int, string> SignalId2Name = new()
     {{
         {{ 1, ""script_changed"" }},
         {{ 2, ""property_list_changed"" }},
@@ -306,7 +318,7 @@ public partial class BehaviorAi
         {{ 9, ""child_exiting_tree"" }},
 {customSignalId2Name}
     }};";
-        
+
         return signalName2Id + "\n\n" + signalId2Name;
     }
 }
