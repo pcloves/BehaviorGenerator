@@ -16,11 +16,11 @@ namespace BehaviorGenerator;
 public class BehaviorGenerator : IIncrementalGenerator
 {
     /// <summary>
-    /// BehaviorAi partial类上下文
+    /// Behavior partial类上下文
     /// </summary>
     /// <param name="FileName"></param>
     /// <param name="DelegateContext"></param>
-    private record struct BehaviorAiFileContext(string FileName, ImmutableArray<EventHandlerContext> DelegateContext);
+    private record struct BehaviorFileContext(string FileName, ImmutableArray<EventHandlerContext> DelegateContext);
 
     /// <summary>
     /// event handler上下文
@@ -31,8 +31,10 @@ public class BehaviorGenerator : IIncrementalGenerator
     private record struct EventHandlerContext(string EventHandlerName, string SignalName,
         ImmutableArray<string> ParamNames);
 
-    private readonly IDictionary<string, BehaviorAiFileContext> _behaviorAiFileContexts =
-        new Dictionary<string, BehaviorAiFileContext>();
+    /// <summary>
+    /// 文件名 -> BehaviorFileContext
+    /// </summary>
+    private readonly Dictionary<string, BehaviorFileContext> _behaviorFileContexts = new();
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -50,16 +52,15 @@ public class BehaviorGenerator : IIncrementalGenerator
     }
 
     private void Execute(SourceProductionContext sourceProductionContext,
-        BehaviorAiFileContext behaviorAiContext)
+        BehaviorFileContext behaviorFileContext)
     {
-        var isMainBehaviorAiClass = behaviorAiContext.FileName.Equals("BehaviorAi.cs");
-        var signalMethod = isMainBehaviorAiClass
+        var signalMethod = behaviorFileContext.FileName.Equals("Behavior.cs")
             ? $"{GenerateConnectSignalMethod()}\n\n{GenerateDisconnectSignalMethod()}"
             : "";
-        var signalField = isMainBehaviorAiClass ? $"{GenerateStaticField()}\n" : "";
+        var signalField = behaviorFileContext.FileName.Equals("Behavior.cs") ? $"{GenerateStaticField()}\n" : "";
 
         var getEventHandlerMethod = new StringBuilder(1024);
-        foreach (var eventHandlerContext in behaviorAiContext.DelegateContext)
+        foreach (var eventHandlerContext in behaviorFileContext.DelegateContext)
         {
             var paramJoin = string.Join(", ", eventHandlerContext.ParamNames);
             var paramSeparator = eventHandlerContext.ParamNames.IsEmpty ? "" : ", ";
@@ -78,7 +79,7 @@ public class BehaviorGenerator : IIncrementalGenerator
 
 namespace Behavior;
 
-public partial class BehaviorAi
+public partial class Behavior
 {{
 {signalField}
 {getEventHandlerMethod}
@@ -86,7 +87,7 @@ public partial class BehaviorAi
 }}
 ";
 
-        sourceProductionContext.AddSource($"{behaviorAiContext.FileName.Replace("cs", "g.cs")}", source);
+        sourceProductionContext.AddSource($"{behaviorFileContext.FileName.Replace("cs", "g.cs")}", source);
     }
 
     private bool SyntacticPredicate(SyntaxNode n, CancellationToken cancellationToken)
@@ -96,7 +97,7 @@ public partial class BehaviorAi
             return false;
         }
 
-        if (!classDeclarationSyntax.Identifier.Text.Equals("BehaviorAi"))
+        if (!classDeclarationSyntax.Identifier.Text.Equals("Behavior"))
         {
             return false;
         }
@@ -104,7 +105,7 @@ public partial class BehaviorAi
         return true;
     }
 
-    private BehaviorAiFileContext SemanticTransform(GeneratorSyntaxContext context,
+    private BehaviorFileContext SemanticTransform(GeneratorSyntaxContext context,
         CancellationToken cancellationToken)
     {
         Debug.Assert(context.Node is ClassDeclarationSyntax);
@@ -131,18 +132,18 @@ public partial class BehaviorAi
                     .ToImmutableArray()))
             .ToImmutableArray();
 
-        var behaviorAiFileContext = new BehaviorAiFileContext(fileName, eventHandlerContexts);
-        _behaviorAiFileContexts[fileName] = behaviorAiFileContext;
+        var behaviorFileContext = new BehaviorFileContext(fileName, eventHandlerContexts);
+        _behaviorFileContexts[fileName] = behaviorFileContext;
 
-        return behaviorAiFileContext;
+        return behaviorFileContext;
     }
 
     private string GenerateConnectSignalMethod()
     {
         var customHandlerBuilder = new StringBuilder(1024);
-        foreach (var behaviorAiFileContext in _behaviorAiFileContexts.Values)
+        foreach (var behaviorFileContext in _behaviorFileContexts.Values)
         {
-            foreach (var eventHandlerContext in behaviorAiFileContext.DelegateContext)
+            foreach (var eventHandlerContext in behaviorFileContext.DelegateContext)
             {
                 customHandlerBuilder.Append($@"        if (SignalName.{eventHandlerContext.SignalName}.Equals(signal))
         {{
@@ -204,9 +205,9 @@ public partial class BehaviorAi
     private string GenerateDisconnectSignalMethod()
     {
         var customHandlerBuilder = new StringBuilder(1024);
-        foreach (var behaviorAiFileContext in _behaviorAiFileContexts.Values)
+        foreach (var behaviorFileContext in _behaviorFileContexts.Values)
         {
-            foreach (var eventHandlerContext in behaviorAiFileContext.DelegateContext)
+            foreach (var eventHandlerContext in behaviorFileContext.DelegateContext)
             {
                 customHandlerBuilder.Append($@"        if (SignalName.{eventHandlerContext.SignalName}.Equals(signal))
         {{
@@ -270,9 +271,9 @@ public partial class BehaviorAi
         var customSignalName2Id = new StringBuilder(1024);
         var customSignalId2Name = new StringBuilder(1024);
         var id = 10;
-        foreach (var behaviorAiFileContext in _behaviorAiFileContexts.Values)
+        foreach (var behaviorFileContext in _behaviorFileContexts.Values)
         {
-            foreach (var eventHandlerContext in behaviorAiFileContext.DelegateContext)
+            foreach (var eventHandlerContext in behaviorFileContext.DelegateContext)
             {
                 customSignalName2Id.Append($"        {{ \"{eventHandlerContext.SignalName}\", {id} }},\n");
                 customSignalId2Name.Append($"        {{ {id}, \"{eventHandlerContext.SignalName}\" }},\n");
