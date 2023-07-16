@@ -31,9 +31,6 @@ public class BehaviorGenerator : IIncrementalGenerator
     private record struct EventHandlerContext(string EventHandlerName, string SignalName,
         ImmutableArray<string> ParamNames);
 
-    private int _behaviorAiPartialClassCount;
-    private int _behaviorAiPartialClassExecutedCount;
-
     private readonly IDictionary<string, BehaviorAiFileContext> _behaviorAiFileContexts =
         new Dictionary<string, BehaviorAiFileContext>();
 
@@ -55,11 +52,11 @@ public class BehaviorGenerator : IIncrementalGenerator
     private void Execute(SourceProductionContext sourceProductionContext,
         BehaviorAiFileContext behaviorAiContext)
     {
-        var lastBehaviorAiClass = ++_behaviorAiPartialClassExecutedCount >= _behaviorAiPartialClassCount;
-        var signalMethod = lastBehaviorAiClass
+        var isMainBehaviorAiClass = behaviorAiContext.FileName.Equals("BehaviorAi.cs");
+        var signalMethod = isMainBehaviorAiClass
             ? $"{GenerateConnectSignalMethod()}\n\n{GenerateDisconnectSignalMethod()}"
             : "";
-        var signalField = lastBehaviorAiClass ? $"{GenerateStaticField()}\n" : "";
+        var signalField = isMainBehaviorAiClass ? $"{GenerateStaticField()}\n" : "";
 
         var getEventHandlerMethod = new StringBuilder(1024);
         foreach (var eventHandlerContext in behaviorAiContext.DelegateContext)
@@ -103,8 +100,6 @@ public partial class BehaviorAi
         {
             return false;
         }
-
-        _behaviorAiPartialClassCount++;
 
         return true;
     }
